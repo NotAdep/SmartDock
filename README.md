@@ -2,7 +2,7 @@
 
 A macOS menu bar app that hides the Dock while a window is **filled** (Window → Fill, `fn ⌃ F`, double-click zoom, or any window manager's "maximise"), then grows that window into the space the Dock leaves behind. Halves and quarters (Window → Move & Resize) count too. It only runs on laptop-sized displays.
 
-Requires macOS 13 or later. Released under the [MIT License](LICENSE). See the [Roadmap](ROADMAP.md) for what's next.
+Requires macOS 13 or later, and is tested on **macOS 15 Sequoia**. The Fill and tile shortcuts it reacts to were added in Sequoia, so on 13–14 only maximised windows (title-bar double-click or tools like Rectangle) trigger it. Newer macOS versions should work but haven't been tested. Released under the [MIT License](LICENSE). See the [Roadmap](ROADMAP.md) for what's next.
 
 ## Behaviour
 
@@ -14,6 +14,15 @@ Requires macOS 13 or later. Released under the [MIT License](LICENSE). See the [
 - **Hands-off cases:** native full screen (it already hides the Dock), and setups where you turned on Dock auto-hide yourself.
 - **Restores everything** on quit or pause: the Dock comes back and grown windows return to their previous size. If the app crashes, the Dock is restored the next time it launches.
 
+## Install (no Xcode needed)
+
+1. Download `SmartDock-<version>.dmg`, open it, and drag **SmartDock** into **Applications**.
+2. Open SmartDock. macOS says it can't verify the app, because it isn't notarised by a paid Apple developer. Click **Done**.
+3. Open **System Settings → Privacy & Security**, scroll down, click **Open Anyway** next to SmartDock, and confirm with your password. On macOS 15, right-click → Open no longer skips this step.
+4. Allow SmartDock under **Privacy & Security → Accessibility** when asked. It needs this to read window sizes.
+
+The app runs on both Apple Silicon and Intel Macs. When you install a newer version, macOS treats it as a new app, so you may need to turn its Accessibility switch off and on again.
+
 ## Build & run
 
 ```bash
@@ -22,6 +31,14 @@ Requires macOS 13 or later. Released under the [MIT License](LICENSE). See the [
 ```
 
 The first time it runs, grant **System Settings → Privacy & Security → Accessibility → SmartDock**. The app is signed with your Apple Development certificate, so the permission survives rebuilds.
+
+To make a shareable DMG:
+
+```bash
+Scripts/package.sh     # → build/release/SmartDock-<version>.dmg
+```
+
+It builds for Apple Silicon and Intel, strips debug symbols (they contain your Mac's folder paths) and signs ad-hoc, so your personal certificate isn't embedded. It refuses to package if your username still appears anywhere in the app.
 
 ## Settings
 

@@ -30,7 +30,7 @@ Ideas for after v2's Fill behaviour, roughly in priority order.
 
 Notarisation needs a paid Apple Developer account ($99/year), which you don't have, so for now builds are personal-use only.
 
-- [ ] **Unnotarised zip or DMG** for friends. They'd need to right-click → Open the first time, or allow it in System Settings → Privacy & Security.
+- [x] **Unnotarised DMG** for friends (`Scripts/package.sh`). They allow it once via System Settings → Privacy & Security → Open Anyway.
 - [ ] *(Needs a developer account)* **Notarised DMG,** opens without Gatekeeper warnings.
 - [ ] *(Needs a developer account)* **Automatic updates** with Sparkle.
 - [ ] *(Only for a public release)* **Stop using the private CoreDock call;** use the System Events fallback, which needs Automation permission.
