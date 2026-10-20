@@ -6,7 +6,7 @@ Ideas for after v2's Fill behaviour, roughly in priority order.
 
 - [x] **Version control.** Git repo in `SmartDock v2/`.
 - [x] **Halves & quarters.** Hide the Dock for Sequoia tiles (Window → Move & Resize). Grow every tile on the screen so the layout stays even.
-- [ ] **GitHub remote.** Push the local repo to your GitHub account.
+- [x] **GitHub.** Public at github.com/NotAdep/SmartDock.
 
 ## Edge cases to check
 
@@ -32,7 +32,7 @@ Notarisation needs a paid Apple Developer account ($99/year), which you don't ha
 
 - [x] **Unnotarised DMG** for friends (`Scripts/package.sh`). They allow it once via System Settings → Privacy & Security → Open Anyway.
 - [x] **Stable self-signed certificate** so updates keep Accessibility access.
-- [ ] **Update check:** "Update available" item in the menu (needs a public repo).
+- [x] **Update check:** "Download SmartDock x.y.z…" in the menu when a newer release exists.
 - [ ] *(Needs a developer account)* **Notarised DMG,** opens without Gatekeeper warnings.
 - [ ] *(Needs a developer account)* **Automatic updates** with Sparkle.
 - [ ] *(Only for a public release)* **Stop using the private CoreDock call;** use the System Events fallback, which needs Automation permission.

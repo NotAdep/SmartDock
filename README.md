@@ -48,6 +48,10 @@ Open **Settings…** (⌘,) from the menu bar icon, or launch with `open build/S
 - **Displays:** the height limit for external displays (720–1600 pt; the built-in display is always active), and whether each connected display is active.
 - **Excluded Apps:** apps that always keep the Dock visible.
 
+## Updates
+
+SmartDock checks this repo's latest GitHub release shortly after launch and once a day. When there's a newer version, the menu shows **Download SmartDock x.y.z…**, which opens the DMG download. **Check for Updates…** checks right away. The check only reads the public release page; nothing about you or your Mac is sent. You can turn automatic checks off in Settings.
+
 ## Troubleshooting
 
 SmartDock logs each time it hides or shows the Dock. To watch it live while you reproduce a problem (use the full `/usr/bin/log` path: in zsh, plain `log` is a different built-in command):
@@ -69,4 +73,5 @@ SmartDock logs each time it hides or shows the Dock. To watch it live while you 
 | `DockController.swift` | Dock auto-hide via CoreDock (instant, native animation), System Events fallback |
 | `AX.swift` | Accessibility helpers, AX↔Cocoa coordinate conversion, per-app window observer |
 | `Settings.swift` | SwiftUI Settings window and its model |
+| `UpdateChecker.swift` | Daily check of the latest GitHub release |
 | `AppDelegate.swift` | Menu bar item, permissions, signal-safe shutdown |

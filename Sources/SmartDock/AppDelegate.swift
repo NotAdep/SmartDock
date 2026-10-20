@@ -2,6 +2,7 @@ import AppKit
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let controller = FillController()
+    private let updater = UpdateChecker()
     private var statusItem: NSStatusItem!
     private var signalSources: [DispatchSourceSignal] = []
     private var permissionPoll: Timer?
@@ -27,6 +28,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         updateIcon()
 
         installSignalHandlers()
+        updater.start()
 
         // `open SmartDock.app --args --settings` opens straight into Settings.
         if CommandLine.arguments.contains("--settings") { openSettings() }
@@ -99,6 +101,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(header)
         menu.addItem(.separator())
 
+        if let update = updater.available {
+            menu.addItem(item("Download SmartDock \(update.version)…", #selector(downloadUpdate)))
+            menu.addItem(.separator())
+        }
+
         if controller.status == .needsPermission {
             menu.addItem(item("Grant Accessibility Access…", #selector(openAccessibilitySettings)))
             menu.addItem(.separator())
@@ -115,6 +122,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(tiles)
 
         menu.addItem(.separator())
+        menu.addItem(item("Check for Updates…", #selector(checkForUpdates)))
         menu.addItem(item("Settings…", #selector(openSettings), key: ","))
         menu.addItem(.separator())
         menu.addItem(item("Quit SmartDock", #selector(quit), key: "q"))
@@ -150,8 +158,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func openSettings() {
-        if settingsWindow == nil { settingsWindow = SettingsWindowController(controller: controller) }
+        if settingsWindow == nil { settingsWindow = SettingsWindowController(controller: controller, updater: updater) }
         settingsWindow?.present()
+    }
+
+    @objc private func downloadUpdate() {
+        guard let update = updater.available else { return }
+        NSWorkspace.shared.open(update.downloadURL)
+    }
+
+    @objc private func checkForUpdates() {
+        updater.check { [weak self] result in
+            let alert = NSAlert()
+            switch result {
+            case .success(let update?):
+                alert.messageText = "SmartDock \(update.version) is available"
+                alert.informativeText = "You have \(UpdateChecker.currentVersion). Download the new version and drag it into Applications to replace this one."
+                alert.addButton(withTitle: "Download")
+                alert.addButton(withTitle: "Later")
+            case .success(nil):
+                alert.messageText = "You're up to date"
+                alert.informativeText = "SmartDock \(UpdateChecker.currentVersion) is the latest version."
+            case .failure(let error):
+                alert.messageText = "Couldn't check for updates"
+                alert.informativeText = error.localizedDescription
+                alert.alertStyle = .warning
+            }
+            NSApp.activate(ignoringOtherApps: true)
+            if alert.runModal() == .alertFirstButtonReturn, case .success(.some) = result {
+                self?.downloadUpdate()
+            }
+        }
     }
 
     @objc private func openAccessibilitySettings() {

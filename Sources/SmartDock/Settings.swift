@@ -21,6 +21,7 @@ final class SettingsModel: ObservableObject {
     }
 
     private let controller: FillController
+    private let updater: UpdateChecker
     private var syncing = false
 
     @Published var isEnabled = true {
@@ -36,14 +37,18 @@ final class SettingsModel: ObservableObject {
             refreshDisplays()
         }
     }
+    @Published var checksForUpdates = true {
+        didSet { if !syncing { updater.checksAutomatically = checksForUpdates } }
+    }
     @Published var opensAtLogin = false {
         didSet { if !syncing { setLoginItem(opensAtLogin) } }
     }
     @Published private(set) var excludedApps: [App] = []
     @Published private(set) var displays: [Display] = []
 
-    init(controller: FillController) {
+    init(controller: FillController, updater: UpdateChecker) {
         self.controller = controller
+        self.updater = updater
         refresh()
         NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
@@ -59,6 +64,7 @@ final class SettingsModel: ObservableObject {
         includesTiles = controller.includesTiles
         maxExternalHeight = controller.maxExternalHeight
         opensAtLogin = SMAppService.mainApp.status == .enabled
+        checksForUpdates = updater.checksAutomatically
         syncing = false
         excludedApps = controller.excludedBundleIDs.map(Self.app(for:))
         refreshDisplays()
@@ -138,8 +144,9 @@ struct SettingsView: View {
                 Toggle("Include halves & quarters", isOn: $model.includesTiles)
                     .disabled(!model.isEnabled)
                 Toggle("Open at login", isOn: $model.opensAtLogin)
+                Toggle("Check for updates automatically", isOn: $model.checksForUpdates)
             } footer: {
-                Text("The Dock hides while the focused window is filled or tiled, and comes back as soon as it isn't.")
+                Text("The Dock hides while the focused window is filled or tiled, and comes back as soon as it isn't. Update checks only read the latest release on GitHub. You're on version \(UpdateChecker.currentVersion).")
                     .settingsFooter()
             }
 
@@ -236,8 +243,8 @@ private extension Text {
 final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     let model: SettingsModel
 
-    init(controller: FillController) {
-        model = SettingsModel(controller: controller)
+    init(controller: FillController, updater: UpdateChecker) {
+        model = SettingsModel(controller: controller, updater: updater)
         let hosting = NSHostingController(rootView: SettingsView(model: model))
         hosting.sizingOptions = [.preferredContentSize]
         let window = NSWindow(contentViewController: hosting)
