@@ -50,10 +50,10 @@ Open **Settings…** (⌘,) from the menu bar icon, or launch with `open build/S
 
 ## Troubleshooting
 
-SmartDock logs each time it hides or shows the Dock. To watch it live while you reproduce a problem:
+SmartDock logs each time it hides or shows the Dock. To watch it live while you reproduce a problem (use the full `/usr/bin/log` path: in zsh, plain `log` is a different built-in command):
 
 ```bash
-log stream --level info --predicate 'subsystem == "com.notadep.SmartDock"'
+/usr/bin/log stream --predicate 'subsystem == "com.notadep.SmartDock"'
 ```
 
 ## App icon

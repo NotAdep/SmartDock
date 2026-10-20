@@ -95,6 +95,7 @@ final class FillController {
     private var appObserver: AppWindowObserver?
     private var pending: DispatchWorkItem?
     private var followUp: DispatchWorkItem?
+    private var focusedIsFullScreen = false
     private let log = Logger(subsystem: "com.notadep.SmartDock", category: "decisions")
     private var heartbeat: Timer?
     private var frameWaiter: Timer?
@@ -196,7 +197,7 @@ final class FillController {
         appObserver = AppWindowObserver(pid: app.processIdentifier) { [weak self] in
             self?.handleEvent()
         }
-        if appObserver == nil { log.info("Couldn't observe \(app.localizedName ?? "app", privacy: .public) yet") }
+        if appObserver == nil { log.notice("Couldn't observe \(app.localizedName ?? "app", privacy: .public) yet") }
     }
 
     /// Every window or app event lands here: a quick, coalesced check now, plus one
@@ -261,6 +262,9 @@ final class FillController {
         pruneExpanded()
 
         guard let target = focusedWindow() else {
+            // In a full-screen Space the Dock is already out of the way, and it ignores
+            // auto-hide changes there. Leave everything as is until the user comes back.
+            if focusedIsFullScreen { return }
             status = .watching
             if weHidDock { showDock() }
             return
@@ -304,9 +308,13 @@ final class FillController {
         let window = AX.element(axApp, kAXFocusedWindowAttribute)
         appObserver?.watch(window)
 
+        focusedIsFullScreen = false
         guard let window else { return nil }
         // Native full screen already hides the Dock in its own Space.
-        if AX.bool(window, "AXFullScreen") == true { return nil }
+        if AX.bool(window, "AXFullScreen") == true {
+            focusedIsFullScreen = true
+            return nil
+        }
         if AX.bool(window, kAXMinimizedAttribute) == true { return nil }
         if let subrole = AX.string(window, kAXSubroleAttribute), subrole != kAXStandardWindowSubrole { return nil }
         guard let frame = AX.frame(of: window), let screen = NSScreen.screen(containing: frame) else { return nil }
@@ -371,7 +379,7 @@ final class FillController {
     private func hideDock(thenExpand target: Target?) {
         let screen = target?.screen ?? NSScreen.screens.first { $0.displayID == dockDisplay }
         let before = screen?.axVisibleFrame
-        log.info("Hiding Dock for \(target?.appName ?? "?", privacy: .public)")
+        log.notice("Hiding Dock for \(target?.appName ?? "?", privacy: .public)")
 
         // Grow the window *before* the Dock leaves. The Dock floats above it, so the
         // new space is revealed by the Dock's own slide animation rather than by the
@@ -408,12 +416,20 @@ final class FillController {
     }
 
     private func showDock() {
-        log.info("Showing Dock (\(String(describing: self.status), privacy: .public))")
+        log.notice("Showing Dock (\(String(describing: self.status), privacy: .public))")
         frameWaiter?.invalidate()
         frameWaiter = nil
-        weHidDock = false
         transitionUntil = Date().addingTimeInterval(1)
         dock.setAutoHide(false)
+
+        // The Dock silently ignores this in some states, e.g. while a full-screen Space
+        // is active. Only let go once it has really taken effect; until then we still
+        // own the hidden Dock, and the heartbeat and next event retry.
+        guard !dock.isAutoHideOn else {
+            log.notice("Dock ignored the request to show; will retry")
+            return
+        }
+        weHidDock = false
     }
 
     private func releaseDock(restoringWindows: Bool) {
