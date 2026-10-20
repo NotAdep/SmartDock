@@ -21,7 +21,7 @@ Requires macOS 13 or later, and is tested on **macOS 15 Sequoia**. The Fill and 
 3. Open **System Settings → Privacy & Security**, scroll down, click **Open Anyway** next to SmartDock, and confirm with your password. On macOS 15, right-click → Open no longer skips this step.
 4. Allow SmartDock under **Privacy & Security → Accessibility** when asked. It needs this to read window sizes.
 
-The app runs on both Apple Silicon and Intel Macs. When you install a newer version, macOS treats it as a new app, so you may need to turn its Accessibility switch off and on again.
+The app runs on both Apple Silicon and Intel Macs. From 2.0.2 on, updates keep their Accessibility access. Coming from 2.0 or 2.0.1, re-enable it once.
 
 ## Build & run
 
@@ -38,7 +38,7 @@ To make a shareable DMG:
 Scripts/package.sh     # → build/release/SmartDock-<version>.dmg
 ```
 
-It builds for Apple Silicon and Intel, strips debug symbols (they contain your Mac's folder paths) and signs ad-hoc, so your personal certificate isn't embedded. It refuses to package if your username still appears anywhere in the app.
+It builds for Apple Silicon and Intel, strips debug symbols (they contain your Mac's folder paths), and signs with a self-signed **NotAdep Code Signing** certificate from your login keychain, so your Apple Development certificate isn't embedded. Every release carries the same certificate, so macOS keeps SmartDock's Accessibility access across updates. Without that certificate it falls back to ad-hoc signing. It refuses to package if your username or an email address appears in the app or the certificate.
 
 ## Settings
 
