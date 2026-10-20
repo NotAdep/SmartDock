@@ -54,17 +54,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     // MARK: Menu bar
 
+    /// Full-strength icon while SmartDock is working on this display, dimmed (like a
+    /// switched-off Wi-Fi icon) while it's paused or the current display is too large.
     private func updateIcon() {
         let symbol: String
+        var dimmed = false
         switch controller.status {
-        case .hiding: symbol = "dock.arrow.down.rectangle"
-        case .disabled, .needsPermission: symbol = "rectangle.dashed"
-        default: symbol = "dock.rectangle"
+        case .hiding:
+            symbol = "dock.arrow.down.rectangle"
+        case .watching, .excluded:
+            symbol = "dock.rectangle"
+        case .ineligibleDisplay, .userAutoHide:
+            symbol = "dock.rectangle"
+            dimmed = true
+        case .disabled:
+            symbol = "rectangle.dashed"
+            dimmed = true
+        case .needsPermission:
+            symbol = "exclamationmark.triangle"
         }
         let image = NSImage(systemSymbolName: symbol, accessibilityDescription: "SmartDock")
         image?.isTemplate = true
         statusItem.button?.image = image
-        statusItem.button?.appearsDisabled = controller.status == .disabled
+        statusItem.button?.appearsDisabled = dimmed
+        statusItem.button?.toolTip = "SmartDock: \(statusText)"
     }
 
     func menuNeedsUpdate(_ menu: NSMenu) {

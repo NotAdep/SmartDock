@@ -24,7 +24,7 @@ Ideas for after v2's Fill behaviour, roughly in priority order.
   - per-app exclusions, for apps where you always want the Dock
 - [x] **App icon.** The menu bar icon stays monochrome.
 - [-] ~~**Auto-hide the menu bar too.**~~ Decided against it: the menu bar stays.
-- [ ] **Unit tests** for the geometry: fill and tile detection, and growing windows into the Dock area.
+- [ ] *(Later)* **Unit tests** for the geometry: fill and tile detection, and growing windows into the Dock area.
 
 ## Sharing it
 
