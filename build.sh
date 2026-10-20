@@ -10,6 +10,7 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$(swift build -c release --show-bin-path)/SmartDock" "$APP/Contents/MacOS/SmartDock"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
+cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 
 # A stable signing identity keeps the Accessibility grant across rebuilds;
 # ad-hoc signing ("-") makes macOS ask again after every build.

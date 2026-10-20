@@ -17,6 +17,7 @@ final class FillController {
         case ineligibleDisplay(String)
         case watching
         case hiding(appName: String)
+        case excluded(appName: String)
     }
 
     private enum Fill {
@@ -31,6 +32,7 @@ final class FillController {
         let frame: CGRect
         let screen: NSScreen
         let appName: String
+        let bundleID: String?
     }
 
     private struct Expanded {
@@ -44,6 +46,7 @@ final class FillController {
         static let hidDock = "dockHiddenBySmartDock"
         static let maxExternalHeight = "maxExternalDisplayHeight"
         static let excludeTiles = "excludeTiles"
+        static let excludedApps = "excludedBundleIDs"
     }
 
     // MARK: Tuning
@@ -101,9 +104,27 @@ final class FillController {
     private var screenSignature = ""
     private var expanded: [Expanded] = []
 
-    private var maxExternalHeight: CGFloat {
-        let v = defaults.double(forKey: Keys.maxExternalHeight)
-        return v > 0 ? v : 1080
+    static let defaultMaxExternalHeight: CGFloat = 1080
+
+    /// External displays up to this height (in points) are treated like a laptop screen.
+    var maxExternalHeight: CGFloat {
+        get {
+            let v = defaults.double(forKey: Keys.maxExternalHeight)
+            return v > 0 ? v : Self.defaultMaxExternalHeight
+        }
+        set {
+            defaults.set(Double(newValue), forKey: Keys.maxExternalHeight)
+            scheduleEvaluate(after: 0, force: true)
+        }
+    }
+
+    /// Apps that always keep the Dock visible.
+    var excludedBundleIDs: [String] {
+        get { defaults.stringArray(forKey: Keys.excludedApps) ?? [] }
+        set {
+            defaults.set(newValue, forKey: Keys.excludedApps)
+            scheduleEvaluate(after: 0, force: true)
+        }
     }
 
     // MARK: Lifecycle
@@ -224,6 +245,12 @@ final class FillController {
             return
         }
 
+        if let id = target.bundleID, excludedBundleIDs.contains(id) {
+            status = .excluded(appName: target.appName)
+            if weHidDock { showDock() }
+            return
+        }
+
         guard isEligible(target.screen) else {
             let size = target.screen.frame.size
             status = .ineligibleDisplay("\(Int(size.width))×\(Int(size.height))")
@@ -245,7 +272,7 @@ final class FillController {
         }
     }
 
-    private func isEligible(_ screen: NSScreen) -> Bool {
+    func isEligible(_ screen: NSScreen) -> Bool {
         screen.isBuiltIn || screen.frame.height <= maxExternalHeight
     }
 
@@ -262,7 +289,8 @@ final class FillController {
         if AX.bool(window, kAXMinimizedAttribute) == true { return nil }
         if let subrole = AX.string(window, kAXSubroleAttribute), subrole != kAXStandardWindowSubrole { return nil }
         guard let frame = AX.frame(of: window), let screen = NSScreen.screen(containing: frame) else { return nil }
-        return Target(element: window, frame: frame, screen: screen, appName: app.localizedName ?? "App")
+        return Target(element: window, frame: frame, screen: screen, appName: app.localizedName ?? "App",
+                      bundleID: app.bundleIdentifier)
     }
 
     private func fillState(of target: Target) -> Fill? {

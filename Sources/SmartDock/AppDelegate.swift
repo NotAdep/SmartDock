@@ -1,11 +1,11 @@
 import AppKit
-import ServiceManagement
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let controller = FillController()
     private var statusItem: NSStatusItem!
     private var signalSources: [DispatchSourceSignal] = []
     private var permissionPoll: Timer?
+    private var settingsWindow: SettingsWindowController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -17,6 +17,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         updateIcon()
 
         installSignalHandlers()
+
+        // `open SmartDock.app --args --settings` opens straight into Settings.
+        if CommandLine.arguments.contains("--settings") { openSettings() }
 
         if !AX.isTrusted {
             AX.requestTrust()
@@ -87,10 +90,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         tiles.indentationLevel = 1
         menu.addItem(tiles)
 
-        let login = item("Open at Login", #selector(toggleLoginItem))
-        login.state = SMAppService.mainApp.status == .enabled ? .on : .off
-        menu.addItem(login)
-
+        menu.addItem(.separator())
+        menu.addItem(item("Settings…", #selector(openSettings), key: ","))
         menu.addItem(.separator())
         menu.addItem(item("Quit SmartDock", #selector(quit), key: "q"))
     }
@@ -103,6 +104,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         case .ineligibleDisplay(let size): return "Inactive on this display (\(size))"
         case .watching: return "Watching for filled windows"
         case .hiding(let app): return "Dock hidden for \(app)"
+        case .excluded(let app): return "Dock kept for \(app)"
         }
     }
 
@@ -115,22 +117,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func toggleEnabled() {
         controller.isEnabled.toggle()
         updateIcon()
+        settingsWindow?.model.refresh()
     }
 
     @objc private func toggleTiles() {
         controller.includesTiles.toggle()
+        settingsWindow?.model.refresh()
     }
 
-    @objc private func toggleLoginItem() {
-        do {
-            if SMAppService.mainApp.status == .enabled {
-                try SMAppService.mainApp.unregister()
-            } else {
-                try SMAppService.mainApp.register()
-            }
-        } catch {
-            NSLog("SmartDock: login item change failed: \(error)")
-        }
+    @objc private func openSettings() {
+        if settingsWindow == nil { settingsWindow = SettingsWindowController(controller: controller) }
+        settingsWindow?.present()
     }
 
     @objc private func openAccessibilitySettings() {

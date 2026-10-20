@@ -19,10 +19,10 @@ Ideas for after v2's Fill behaviour, roughly in priority order.
 
 ## Polish
 
-- [ ] **Settings window** (SwiftUI) instead of `defaults write`:
+- [x] **Settings window** (SwiftUI) instead of `defaults write`:
   - display-size limit for external displays
   - per-app exclusions, for apps where you always want the Dock
-- [ ] **App icon,** plus a short transition on the menu bar icon when the Dock hides or shows.
+- [x] **App icon.** The menu bar icon stays monochrome.
 - [-] ~~**Auto-hide the menu bar too.**~~ Decided against it: the menu bar stays.
 - [ ] **Unit tests** for the geometry: fill and tile detection, and growing windows into the Dock area.
 

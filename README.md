@@ -21,11 +21,17 @@ A menu bar app that hides the Dock while a window is **filled** (Window → Fill
 
 The first time it runs, grant **System Settings → Privacy & Security → Accessibility → SmartDock**. The app is signed with your Apple Development certificate, so the permission survives rebuilds.
 
-## Tuning (optional)
+## Settings
 
-```bash
-defaults write com.notadep.SmartDock maxExternalDisplayHeight -float 1200   # allow taller externals
-```
+Open **Settings…** (⌘,) from the menu bar icon, or launch with `open build/SmartDock.app --args --settings`. It has:
+
+- **Behaviour:** pause SmartDock, include halves & quarters, open at login.
+- **Displays:** the height limit for external displays (720–1600 pt; the built-in display is always active), and whether each connected display is active.
+- **Excluded Apps:** apps that always keep the Dock visible.
+
+## App icon
+
+`Resources/AppIcon.icns` is drawn in code. To change it, edit `Scripts/make-icon.swift` and run `swift Scripts/make-icon.swift`. That also writes a 1024 px preview to `Resources/AppIcon-preview.png`.
 
 ## Layout
 
@@ -35,4 +41,5 @@ defaults write com.notadep.SmartDock maxExternalDisplayHeight -float 1200   # al
 | `Tiling.swift` | Fill/half/quarter detection and remapping between the Dock-visible and Dock-hidden areas |
 | `DockController.swift` | Dock auto-hide via CoreDock (instant, native animation), System Events fallback |
 | `AX.swift` | Accessibility helpers, AX↔Cocoa coordinate conversion, per-app window observer |
-| `AppDelegate.swift` | Menu bar item, permissions, login item, signal-safe shutdown |
+| `Settings.swift` | SwiftUI Settings window and its model |
+| `AppDelegate.swift` | Menu bar item, permissions, signal-safe shutdown |
