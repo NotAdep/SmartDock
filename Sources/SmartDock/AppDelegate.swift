@@ -81,6 +81,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         enabled.state = controller.isEnabled ? .on : .off
         menu.addItem(enabled)
 
+        let tiles = item("Include Halves & Quarters", #selector(toggleTiles))
+        tiles.state = controller.includesTiles ? .on : .off
+        tiles.isEnabled = controller.isEnabled
+        tiles.indentationLevel = 1
+        menu.addItem(tiles)
+
         let login = item("Open at Login", #selector(toggleLoginItem))
         login.state = SMAppService.mainApp.status == .enabled ? .on : .off
         menu.addItem(login)
@@ -109,6 +115,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func toggleEnabled() {
         controller.isEnabled.toggle()
         updateIcon()
+    }
+
+    @objc private func toggleTiles() {
+        controller.includesTiles.toggle()
     }
 
     @objc private func toggleLoginItem() {

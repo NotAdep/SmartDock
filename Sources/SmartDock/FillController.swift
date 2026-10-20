@@ -5,9 +5,10 @@ import ApplicationServices
 ///
 /// Rule: the Dock is hidden exactly while the focused window of the frontmost app is
 /// *filled* (macOS "Fill", zoom, or any tool that sizes a window to the usable screen
-/// area) on an eligible display. When the Dock hides, the window is grown into the
-/// space the Dock leaves behind. Moving, shrinking, minimising or closing the window,
-/// or switching to a window that isn't filled, brings the Dock back.
+/// area) or, optionally, tiled to a half or quarter, on an eligible display. When the
+/// Dock hides, every tiled window on that screen is grown into the space the Dock
+/// leaves behind. Moving, shrinking, minimising or closing the window, or switching
+/// to a window that isn't filled or tiled, brings the Dock back.
 final class FillController {
     enum Status: Equatable {
         case needsPermission
@@ -42,14 +43,11 @@ final class FillController {
         static let disabled = "disabled"
         static let hidDock = "dockHiddenBySmartDock"
         static let maxExternalHeight = "maxExternalDisplayHeight"
+        static let excludeTiles = "excludeTiles"
     }
 
     // MARK: Tuning
 
-    /// How far each window edge may sit inside the usable area and still count as
-    /// touching it. Covers Sequoia's "Tiled windows have margins" and apps that round
-    /// their size (e.g. Terminal's character grid).
-    private let edgeSlack: ClosedRange<CGFloat> = -3...16
     private let settleDelay: TimeInterval = 0.06
 
     // MARK: State
@@ -69,6 +67,15 @@ final class FillController {
                 releaseDock(restoringWindows: true)
                 status = .disabled
             }
+        }
+    }
+
+    /// Whether halves and quarters count, not just Fill.
+    var includesTiles: Bool {
+        get { !defaults.bool(forKey: Keys.excludeTiles) }
+        set {
+            defaults.set(!newValue, forKey: Keys.excludeTiles)
+            scheduleEvaluate(after: 0, force: true)
         }
     }
 
@@ -219,7 +226,7 @@ final class FillController {
         if !weHidDock {
             hideDock(thenExpand: fill == .besideDock ? target : nil)
         } else if fill == .besideDock, frameWaiter == nil {
-            expand(target)
+            growLayout(around: target)
         }
     }
 
@@ -251,18 +258,18 @@ final class FillController {
         if expanded.contains(where: { CFEqual($0.window, target.element) && $0.frame.isClose(to: target.frame) }) {
             return .overDock
         }
-        if let hidden = hiddenFrame(for: target.screen), touchesAllEdges(target.frame, of: hidden) {
+        if let hidden = hiddenFrame(for: target.screen), isLayout(target.frame, in: hidden) {
             return .overDock
         }
-        if let shown = shownFrames[id], touchesAllEdges(target.frame, of: shown) {
+        if let shown = shownFrames[id], isLayout(target.frame, in: shown) {
             return .besideDock
         }
         return nil
     }
 
-    private func touchesAllEdges(_ window: CGRect, of area: CGRect) -> Bool {
-        let insets = window.insets(within: area)
-        return [insets.left, insets.top, insets.right, insets.bottom].allSatisfy(edgeSlack.contains)
+    private func isLayout(_ frame: CGRect, in area: CGRect) -> Bool {
+        guard let (tile, _) = Tiling.match(frame, in: area) else { return false }
+        return tile.isFill || includesTiles
     }
 
     // MARK: Screen geometry
@@ -297,7 +304,7 @@ final class FillController {
         // Grow the window *before* the Dock leaves. The Dock floats above it, so the
         // new space is revealed by the Dock's own slide animation rather than by the
         // window stretching frame by frame.
-        if let target { expand(target) }
+        if let target { growLayout(around: target) }
 
         weHidDock = true
         transitionUntil = Date().addingTimeInterval(1)
@@ -319,10 +326,12 @@ final class FillController {
             self.frameWaiter = nil
             guard changed, let now, let current else { return }
             self.hiddenFrames[id] = now
-            // Correct the size if the estimate we grew to differs from the real area.
-            if let target, let frame = AX.frame(of: target.element) {
-                self.expand(Target(element: target.element, frame: frame, screen: current, appName: target.appName))
+            // Correct the sizes if the estimate we grew to differs from the real area.
+            for entry in self.expanded {
+                guard let frame = AX.frame(of: entry.window), NSScreen.screen(containing: frame)?.displayID == id else { continue }
+                self.grow(entry.window, from: frame, on: current)
             }
+            if !self.expanded.isEmpty { self.scheduleEvaluate(after: 0.32, force: true) }
         }
     }
 
@@ -346,31 +355,61 @@ final class FillController {
 
     // MARK: Window growth
 
-    /// Grows a window that fills the Dock-visible area into the Dock-hidden area in
-    /// one step, keeping whatever margins it had.
-    private func expand(_ target: Target) {
-        let id = target.screen.displayID
-        guard let shown = shownFrames[id], let hidden = hiddenFrame(for: target.screen) else { return }
-        let original = expanded.first { CFEqual($0.window, target.element) }?.original ?? target.frame
+    /// Grows the target and, when tiles count, every other tiled window on its screen,
+    /// so a side-by-side or quartered layout stays even.
+    private func growLayout(around target: Target) {
+        grow(target.element, from: target.frame, on: target.screen)
+        if includesTiles {
+            for (window, frame) in tiledWindows(on: target.screen, excluding: target.element) {
+                grow(window, from: frame, on: target.screen)
+            }
+        }
+        scheduleEvaluate(after: 0.32, force: true)
+    }
 
-        let i = original.insets(within: shown)
-        let margin = max(0, min(i.left, i.top, i.right))
-        let dockLeft = hidden.minX < shown.minX - 1
-        let dockRight = hidden.maxX > shown.maxX + 1
-        let dockBottom = hidden.maxY > shown.maxY + 1
-
-        let left = hidden.minX + (dockLeft ? margin : max(0, i.left))
-        let right = hidden.maxX - (dockRight ? margin : max(0, i.right))
-        let top = hidden.minY + max(0, i.top)
-        let bottom = hidden.maxY - (dockBottom ? margin : max(0, i.bottom))
-        let goal = CGRect(x: left, y: top, width: right - left, height: bottom - top).integral
+    /// Moves one window from the Dock-visible layout onto the Dock-hidden one in a
+    /// single step, keeping its margins and remembering where it came from.
+    private func grow(_ window: AXUIElement, from current: CGRect, on screen: NSScreen) {
+        let id = screen.displayID
+        guard let shown = shownFrames[id], let hidden = hiddenFrame(for: screen) else { return }
+        let original = expanded.first { CFEqual($0.window, window) }?.original ?? current
+        guard let goal = Tiling.remap(original, from: shown, to: hidden) else { return }
 
         quietUntil = Date().addingTimeInterval(0.3)
-        AX.setFrame(target.element, goal, current: target.frame)
-        let actual = AX.frame(of: target.element) ?? goal
-        expanded.removeAll { CFEqual($0.window, target.element) }
-        expanded.append(Expanded(window: target.element, original: original, frame: actual))
-        scheduleEvaluate(after: 0.32, force: true)
+        AX.setFrame(window, goal, current: current)
+        let actual = AX.frame(of: window) ?? goal
+        expanded.removeAll { CFEqual($0.window, window) }
+        expanded.append(Expanded(window: window, original: original, frame: actual))
+    }
+
+    /// Other visible windows on `screen` that sit on the Dock-visible tiling grid.
+    private func tiledWindows(on screen: NSScreen, excluding focused: AXUIElement) -> [(AXUIElement, CGRect)] {
+        guard let shown = shownFrames[screen.displayID],
+              let info = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
+                as? [[String: Any]] else { return [] }
+
+        let pids = Set(info.compactMap { entry -> pid_t? in
+            guard entry[kCGWindowLayer as String] as? Int == 0 else { return nil }
+            return entry[kCGWindowOwnerPID as String] as? pid_t
+        }).subtracting([getpid()])
+
+        var result: [(AXUIElement, CGRect)] = []
+        for pid in pids {
+            let app = AXUIElementCreateApplication(pid)
+            AXUIElementSetMessagingTimeout(app, 0.2)
+            guard let windows = AX.copy(app, kAXWindowsAttribute) as? [AXUIElement] else { continue }
+            for window in windows where !CFEqual(window, focused) {
+                guard AX.string(window, kAXSubroleAttribute) == kAXStandardWindowSubrole,
+                      AX.bool(window, kAXMinimizedAttribute) != true,
+                      AX.bool(window, "AXFullScreen") != true,
+                      let frame = AX.frame(of: window),
+                      NSScreen.screen(containing: frame)?.displayID == screen.displayID,
+                      !expanded.contains(where: { CFEqual($0.window, window) && $0.frame.isClose(to: frame) }),
+                      Tiling.match(frame, in: shown) != nil else { continue }
+                result.append((window, frame))
+            }
+        }
+        return result
     }
 
     private func pruneExpanded() {
@@ -391,11 +430,6 @@ private extension NSScreen {
 }
 
 private extension CGRect {
-    /// Distance of each edge inside `area` (negative = beyond it). AX coordinates.
-    func insets(within area: CGRect) -> (left: CGFloat, top: CGFloat, right: CGFloat, bottom: CGFloat) {
-        (minX - area.minX, minY - area.minY, area.maxX - maxX, area.maxY - maxY)
-    }
-
     func isClose(to other: CGRect, tolerance: CGFloat = 3) -> Bool {
         abs(minX - other.minX) <= tolerance && abs(minY - other.minY) <= tolerance
             && abs(width - other.width) <= tolerance && abs(height - other.height) <= tolerance
