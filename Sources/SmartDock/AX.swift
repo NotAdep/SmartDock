@@ -96,6 +96,10 @@ final class AppWindowObserver {
         kAXFocusedWindowChangedNotification,
         kAXMainWindowChangedNotification,
         kAXWindowCreatedNotification,
+        // App-wide move/resize, so a window that gains focus without telling us is
+        // still caught when it's filled or tiled.
+        kAXWindowMovedNotification,
+        kAXWindowResizedNotification,
         kAXApplicationHiddenNotification,
         kAXApplicationShownNotification,
     ]

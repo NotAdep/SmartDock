@@ -1,5 +1,6 @@
 import AppKit
 import ApplicationServices
+import os
 
 /// The core state machine.
 ///
@@ -92,6 +93,8 @@ final class FillController {
     }
     private var appObserver: AppWindowObserver?
     private var pending: DispatchWorkItem?
+    private var followUp: DispatchWorkItem?
+    private let log = Logger(subsystem: "com.notadep.SmartDock", category: "decisions")
     private var heartbeat: Timer?
     private var frameWaiter: Timer?
     /// Ignore AX echoes of our own resizes until this moment.
@@ -140,11 +143,11 @@ final class FillController {
         let ws = NSWorkspace.shared.notificationCenter
         ws.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { [weak self] _ in
             self?.attachToFrontmostApp()
-            self?.scheduleEvaluate(after: 0, force: true)
+            self?.handleEvent(immediately: true)
         }
         for name in [NSWorkspace.activeSpaceDidChangeNotification, NSWorkspace.didWakeNotification] {
             ws.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
-                self?.scheduleEvaluate(force: true)
+                self?.handleEvent()
             }
         }
         NotificationCenter.default.addObserver(
@@ -161,6 +164,7 @@ final class FillController {
     /// Puts everything back the way the user had it.
     func shutdown() {
         pending?.cancel()
+        followUp?.cancel()
         releaseDock(restoringWindows: true)
     }
 
@@ -189,8 +193,24 @@ final class FillController {
               app.processIdentifier != getpid() else { return }
         guard appObserver?.pid != app.processIdentifier else { return }
         appObserver = AppWindowObserver(pid: app.processIdentifier) { [weak self] in
-            self?.scheduleEvaluate()
+            self?.handleEvent()
         }
+        if appObserver == nil { log.info("Couldn't observe \(app.localizedName ?? "app", privacy: .public) yet") }
+    }
+
+    /// Every window or app event lands here: a quick, coalesced check now, plus one
+    /// trailing re-check once things go quiet. Apps sometimes report a focus change or
+    /// finish resizing a moment after their last notification; without the trailing
+    /// check that last state could go unseen until the next event.
+    private func handleEvent(immediately: Bool = false) {
+        scheduleEvaluate(after: immediately ? 0 : nil, force: immediately)
+        followUp?.cancel()
+        let item = DispatchWorkItem { [weak self] in
+            self?.followUp = nil
+            self?.scheduleEvaluate(force: true)
+        }
+        followUp = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: item)
     }
 
     private func screensChanged() {
@@ -202,7 +222,7 @@ final class FillController {
             dockDisplay = nil
             expanded.removeAll()
         }
-        scheduleEvaluate(force: true)
+        handleEvent()
     }
 
     private static func currentScreenSignature() -> String {
@@ -318,7 +338,14 @@ final class FillController {
     // MARK: Screen geometry
 
     private func learnScreenFrames() {
-        guard Date() >= transitionUntil, !weHidDock, !dock.isAutoHideOn else { return }
+        let now = Date()
+        if now < transitionUntil {
+            // Look again once the screen settles, so a window filled during the
+            // transition isn't judged against stale frames and then forgotten.
+            if !weHidDock { scheduleEvaluate(after: transitionUntil.timeIntervalSince(now) + 0.05, force: true) }
+            return
+        }
+        guard !weHidDock, !dock.isAutoHideOn else { return }
         let screens = NSScreen.screens
         for screen in screens {
             shownFrames[screen.displayID] = screen.axVisibleFrame
@@ -343,6 +370,7 @@ final class FillController {
     private func hideDock(thenExpand target: Target?) {
         let screen = target?.screen ?? NSScreen.screens.first { $0.displayID == dockDisplay }
         let before = screen?.axVisibleFrame
+        log.info("Hiding Dock for \(target?.appName ?? "?", privacy: .public)")
 
         // Grow the window *before* the Dock leaves. The Dock floats above it, so the
         // new space is revealed by the Dock's own slide animation rather than by the
@@ -379,6 +407,7 @@ final class FillController {
     }
 
     private func showDock() {
+        log.info("Showing Dock (\(String(describing: self.status), privacy: .public))")
         frameWaiter?.invalidate()
         frameWaiter = nil
         weHidDock = false

@@ -29,6 +29,14 @@ Open **Settings…** (⌘,) from the menu bar icon, or launch with `open build/S
 - **Displays:** the height limit for external displays (720–1600 pt; the built-in display is always active), and whether each connected display is active.
 - **Excluded Apps:** apps that always keep the Dock visible.
 
+## Troubleshooting
+
+SmartDock logs each time it hides or shows the Dock. To watch it live while you reproduce a problem:
+
+```bash
+log stream --level info --predicate 'subsystem == "com.notadep.SmartDock"'
+```
+
 ## App icon
 
 `Resources/AppIcon.icns` is drawn in code. To change it, edit `Scripts/make-icon.swift` and run `swift Scripts/make-icon.swift`. That also writes a 1024 px preview to `Resources/AppIcon-preview.png`.
