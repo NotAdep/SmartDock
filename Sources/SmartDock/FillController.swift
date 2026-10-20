@@ -82,7 +82,10 @@ final class FillController {
     private let dock = DockController()
     private let defaults = UserDefaults.standard
     private var weHidDock = false {
-        didSet { defaults.set(weHidDock, forKey: Keys.hidDock) }
+        didSet {
+            defaults.set(weHidDock, forKey: Keys.hidDock)
+            updateHeartbeat()
+        }
     }
     private var appObserver: AppWindowObserver?
     private var pending: DispatchWorkItem?
@@ -129,11 +132,6 @@ final class FillController {
             self?.screensChanged()
         }
 
-        // Safety net for anything the AX notifications miss.
-        heartbeat = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { [weak self] _ in
-            self?.scheduleEvaluate()
-        }
-
         screenSignature = Self.currentScreenSignature()
         attachToFrontmostApp()
         scheduleEvaluate(after: 0)
@@ -141,12 +139,29 @@ final class FillController {
 
     /// Puts everything back the way the user had it.
     func shutdown() {
-        heartbeat?.invalidate()
         pending?.cancel()
         releaseDock(restoringWindows: true)
     }
 
     // MARK: Events
+
+    /// Safety net for AX notifications an app fails to send. It only runs while we're
+    /// hiding the Dock, the one state where a missed event would leave things wrong,
+    /// and with generous tolerance so macOS can batch the wakeup with other work.
+    private func updateHeartbeat() {
+        guard weHidDock else {
+            heartbeat?.invalidate()
+            heartbeat = nil
+            return
+        }
+        guard heartbeat == nil else { return }
+        let timer = Timer(timeInterval: 1.5, repeats: true) { [weak self] _ in
+            self?.scheduleEvaluate()
+        }
+        timer.tolerance = 0.5
+        RunLoop.main.add(timer, forMode: .common)
+        heartbeat = timer
+    }
 
     private func attachToFrontmostApp() {
         guard AX.isTrusted, let app = NSWorkspace.shared.frontmostApplication,
