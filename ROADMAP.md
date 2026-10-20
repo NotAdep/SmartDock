@@ -4,7 +4,7 @@ Ideas for after v2's Fill behaviour, roughly in priority order.
 
 ## Now
 
-- [x] **Version control.** Local git repo at the `SmartDock/` root.
+- [x] **Version control.** Git repo in `SmartDock v2/`.
 - [x] **Halves & quarters.** Hide the Dock for Sequoia tiles (Window → Move & Resize). Grow every tile on the screen so the layout stays even.
 - [ ] **GitHub remote.** Push the local repo to your GitHub account.
 

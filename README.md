@@ -1,6 +1,8 @@
-# SmartDock v2
+# SmartDock
 
-A menu bar app that hides the Dock while a window is **filled** (Window → Fill, `fn ⌃ F`, double-click zoom, or any window manager's "maximise"), then grows that window into the space the Dock leaves behind. Halves and quarters (Window → Move & Resize) count too. It only runs on laptop-sized displays.
+A macOS menu bar app that hides the Dock while a window is **filled** (Window → Fill, `fn ⌃ F`, double-click zoom, or any window manager's "maximise"), then grows that window into the space the Dock leaves behind. Halves and quarters (Window → Move & Resize) count too. It only runs on laptop-sized displays.
+
+Requires macOS 13 or later. Released under the [MIT License](LICENSE). See the [Roadmap](ROADMAP.md) for what's next.
 
 ## Behaviour
 
