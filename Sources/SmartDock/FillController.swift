@@ -57,7 +57,8 @@ final class FillController {
     // MARK: State
 
     var onStatusChange: ((Status) -> Void)?
-    private(set) var status: Status = .watching {
+    /// Until `start()` runs (it waits for Accessibility access), this reflects the permission.
+    private(set) var status: Status = AX.isTrusted ? .watching : .needsPermission {
         didSet { if status != oldValue { onStatusChange?(status) } }
     }
 

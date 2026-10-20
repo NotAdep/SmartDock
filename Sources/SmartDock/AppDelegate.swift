@@ -8,6 +8,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var settingsWindow: SettingsWindowController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Two copies would fight over the Dock (e.g. a stale login item plus a manual
+        // launch), so a second copy hands over to the first and quits.
+        let me = NSRunningApplication.current
+        if let other = NSRunningApplication.runningApplications(withBundleIdentifier: Bundle.main.bundleIdentifier ?? "")
+            .first(where: { $0.processIdentifier != me.processIdentifier }) {
+            other.activate()
+            NSApp.terminate(nil)
+            return
+        }
+
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         let menu = NSMenu()
         menu.delegate = self
@@ -28,6 +38,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 guard AX.isTrusted else { return }
                 timer.invalidate()
                 self?.controller.start()
+                self?.updateIcon()
             }
         } else {
             controller.start()
